@@ -7,11 +7,11 @@ import numpy as np
 from database import fetch_df
 
 # Trọng số điểm cho từng hành vi người dùng
+# Chỉ bao gồm các action có trong ENUM của tbl_user_behavior_logs
 ACTION_WEIGHTS = {
     "view": 1,
     "search": 1,
     "wishlist": 2,
-    "remove_wishlist": -2,
     "add_to_cart": 3,
     "remove_from_cart": -1,
     "purchase": 5,

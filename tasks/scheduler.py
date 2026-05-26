@@ -1,7 +1,8 @@
 """
-Lên lịch tự động train lại mô hình.
+Lên lịch tự động train lại mô hình và gửi thông báo nhắc mua lại.
 - Collaborative: mỗi 6 giờ
 - Association + Clustering + Repurchase: mỗi ngày lúc 2:00 AM
+- Repurchase notifications: mỗi ngày lúc 8:00 AM
 """
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -32,6 +33,17 @@ def _train_daily():
         db.close()
 
 
+def _send_notifications():
+    db = SessionLocal()
+    try:
+        result = repurchase.send_repurchase_notifications(db)
+        print(f"[Scheduler] Repurchase notifications: {result}")
+    except Exception as e:
+        print(f"[Scheduler] Notification error: {e}")
+    finally:
+        db.close()
+
+
 def start_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler()
 
@@ -45,6 +57,12 @@ def start_scheduler() -> BackgroundScheduler:
         _train_daily,
         trigger=CronTrigger(hour=2, minute=0),
         id="train_daily",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _send_notifications,
+        trigger=CronTrigger(hour=8, minute=0),
+        id="send_repurchase_notifications",
         replace_existing=True,
     )
 

@@ -6,12 +6,13 @@ Kết quả được lưu vào tbl_association_rules.
 import pandas as pd
 from mlxtend.frequent_patterns import fpgrowth, association_rules
 from mlxtend.preprocessing import TransactionEncoder
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from data.preprocessor import load_order_items
 
-MIN_SUPPORT = 0.01       # Xuất hiện trong ít nhất 1% đơn hàng
-MIN_CONFIDENCE = 0.2     # Xác suất mua B khi đã mua A >= 20%
+MIN_SUPPORT = 0.003      # Xuất hiện trong ít nhất ~4 đơn hàng (phù hợp dữ liệu ~1400 đơn)
+MIN_CONFIDENCE = 0.1     # Xác suất mua B khi đã mua A >= 10%
 MIN_LIFT = 1.0           # Lift > 1 nghĩa là có mối liên hệ thực sự
 
 
@@ -49,31 +50,30 @@ def train(db: Session) -> dict:
 
     # Chỉ giữ luật 1 antecedent -> 1 consequent (đơn giản, dễ dùng)
     rules = rules[
-        rules["antecedents"].apply(len) == 1
-    ][
-        rules["consequents"].apply(len) == 1
+        (rules["antecedents"].apply(len) == 1) &
+        (rules["consequents"].apply(len) == 1)
     ].copy()
 
     rules["antecedent_id"] = rules["antecedents"].apply(lambda x: int(list(x)[0]))
     rules["consequent_id"] = rules["consequents"].apply(lambda x: int(list(x)[0]))
 
     # Lưu vào DB (xoá cũ, insert mới)
-    db.execute(
-        __import__("sqlalchemy").text("DELETE FROM tbl_association_rules")
-    )
+    db.execute(text("DELETE FROM tbl_association_rules"))
+    db.flush()
 
     rows = rules[["antecedent_id", "consequent_id", "support", "confidence", "lift"]].to_dict("records")
     if rows:
-        db.execute(
-            __import__("sqlalchemy").text("""
-                INSERT INTO tbl_association_rules
-                    (fk_antecedent, fk_consequent, support, confidence, lift)
-                VALUES
-                    (:antecedent_id, :consequent_id, :support, :confidence, :lift)
-            """),
-            rows,
-        )
-    db.commit()
+        for row in rows:
+            db.execute(
+                text("""
+                    INSERT INTO tbl_association_rules
+                        (fk_antecedent, fk_consequent, support, confidence, lift)
+                    VALUES
+                        (:antecedent_id, :consequent_id, :support, :confidence, :lift)
+                """),
+                row,
+            )
+        db.commit()
 
     return {"rules_saved": len(rows)}
 
