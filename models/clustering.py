@@ -57,6 +57,28 @@ def train(db: Session, n_clusters: int = None) -> dict:
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
+    input_info = {
+        "input": {
+            "total_users": len(df),
+            "features": FEATURES,
+            "feature_stats": {
+                col: {
+                    "mean": round(float(df[col].mean()), 2),
+                    "min": round(float(df[col].min()), 2),
+                    "max": round(float(df[col].max()), 2),
+                }
+                for col in FEATURES
+            },
+        }
+    }
+    print("\n[Clustering] ── Dữ liệu đầu vào ────────────────────────")
+    print(f"  Tổng người dùng: {len(df)}")
+    print(f"  Features       : {FEATURES}")
+    for col in FEATURES:
+        stats = input_info["input"]["feature_stats"][col]
+        print(f"  {col:<28}: mean={stats['mean']}, min={stats['min']}, max={stats['max']}")
+    print("────────────────────────────────────────────────────────\n")
+
     k = n_clusters or _find_best_k(X_scaled)
     k = min(k, len(df))  # không thể có nhiều cụm hơn số user
 
@@ -99,12 +121,23 @@ def train(db: Session, n_clusters: int = None) -> dict:
         )
     db.commit()
 
-    return {
+    result = {
+        **input_info,
         "n_clusters": k,
         "silhouette_score": round(sil_score, 4),
         "segment_distribution": df["cluster"].value_counts().to_dict(),
         "segment_names": segment_labels,
     }
+    print("[Clustering] ── Kết quả huấn luyện ─────────────────────────")
+    print(f"  Số cụm (k)         : {k}")
+    print(f"  Silhouette score   : {round(sil_score, 4)}")
+    print(f"  Phân bổ cụm        : {df['cluster'].value_counts().to_dict()}")
+    for cid, name in segment_labels.items():
+        count = (df["cluster"] == cid).sum()
+        print(f"    Cụm {cid} ({name}): {count} users")
+    print(f"  Model đã lưu tại   : {MODEL_PATH}")
+    print("────────────────────────────────────────────────────────\n")
+    return result
 
 
 def _label_segments(stats: pd.DataFrame, k: int) -> dict:

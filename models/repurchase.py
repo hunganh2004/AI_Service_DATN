@@ -32,6 +32,29 @@ def train(db: Session) -> dict:
 
     df = df.fillna({"weight_gram": df["weight_gram"].median()})
 
+    input_info = {
+        "input": {
+            "total_samples": len(df),
+            "unique_users": df["user_id"].nunique(),
+            "unique_products": df["product_id"].nunique(),
+            "days_between_stats": {
+                "mean": round(float(df["days_between"].mean()), 2),
+                "min": int(df["days_between"].min()),
+                "max": int(df["days_between"].max()),
+                "median": round(float(df["days_between"].median()), 2),
+            },
+            "features": FEATURES,
+        }
+    }
+    print("\n[Repurchase] ── Dữ liệu đầu vào ────────────────────────")
+    print(f"  Tổng mẫu huấn luyện: {len(df)}")
+    print(f"  Số người dùng      : {df['user_id'].nunique()}")
+    print(f"  Số sản phẩm        : {df['product_id'].nunique()}")
+    s = input_info["input"]["days_between_stats"]
+    print(f"  Chu kỳ mua lại (ngày): mean={s['mean']}, median={s['median']}, min={s['min']}, max={s['max']}")
+    print(f"  Features           : {FEATURES}")
+    print("────────────────────────────────────────────────────────\n")
+
     # Thêm avg_days_between: trung bình chu kỳ mua lại theo từng user-product
     avg_cycle = (
         df.groupby(["user_id", "product_id"])["days_between"]
@@ -70,7 +93,14 @@ def train(db: Session) -> dict:
     # Tạo dự đoán cho tất cả user-product pairs
     _generate_predictions(model, le, db, model_confidence)
 
-    return {"mae_days": round(mae, 2), "r2_score": round(r2, 4), "n_samples": len(df)}
+    result = {**input_info, "mae_days": round(mae, 2), "r2_score": round(r2, 4), "n_samples": len(df)}
+    print("[Repurchase] ── Kết quả huấn luyện ─────────────────────────")
+    print(f"  MAE (ngày)         : {round(mae, 2)}")
+    print(f"  R² score           : {round(r2, 4)}")
+    print(f"  Confidence model   : {round(model_confidence, 4)}")
+    print(f"  Model đã lưu tại   : {MODEL_PATH}")
+    print("────────────────────────────────────────────────────────\n")
+    return result
 
 
 def _generate_predictions(model, le: LabelEncoder, db: Session, model_confidence: float = 0.75):

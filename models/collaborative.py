@@ -30,6 +30,25 @@ def train(save: bool = True) -> dict:
     if matrix.shape[0] < 2 or matrix.shape[1] < 2:
         return {"error": "Chưa đủ dữ liệu để huấn luyện"}
 
+    input_info = {
+        "input": {
+            "total_logs": len(df),
+            "unique_users": df["user_id"].nunique(),
+            "unique_products": df["product_id"].nunique(),
+            "action_distribution": df["action"].value_counts().to_dict(),
+            "matrix_shape": {"users": matrix.shape[0], "products": matrix.shape[1]},
+            "sparsity_pct": round(100 * (matrix == 0).values.sum() / matrix.size, 2),
+        }
+    }
+    print("\n[Collaborative] ── Dữ liệu đầu vào ──────────────────────")
+    print(f"  Tổng logs         : {input_info['input']['total_logs']}")
+    print(f"  Số người dùng     : {input_info['input']['unique_users']}")
+    print(f"  Số sản phẩm       : {input_info['input']['unique_products']}")
+    print(f"  Kích thước ma trận: {matrix.shape[0]} x {matrix.shape[1]}")
+    print(f"  Độ thưa (sparsity): {input_info['input']['sparsity_pct']}%")
+    print(f"  Phân bổ hành vi   : {df['action'].value_counts().to_dict()}")
+    print("────────────────────────────────────────────────────────\n")
+
     n_components = min(50, matrix.shape[0] - 1, matrix.shape[1] - 1)
     svd = TruncatedSVD(n_components=n_components, random_state=42)
 
@@ -61,12 +80,19 @@ def train(save: bool = True) -> dict:
         with open(MATRIX_PATH, "wb") as f:
             pickle.dump(matrix, f)
 
-    return {
+    result = {
+        **input_info,
         "rmse": round(float(np.mean(rmse_scores)), 4) if rmse_scores else None,
         "n_components": n_components,
         "n_users": matrix.shape[0],
         "n_products": matrix.shape[1],
     }
+    print("[Collaborative] ── Kết quả huấn luyện ─────────────────────")
+    print(f"  Số components (SVD): {n_components}")
+    print(f"  RMSE (cross-val)   : {result['rmse']}")
+    print(f"  Model đã lưu tại   : {MODEL_PATH}")
+    print("────────────────────────────────────────────────────────\n")
+    return result
 
 
 def _load_model() -> TruncatedSVD:

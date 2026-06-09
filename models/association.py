@@ -31,6 +31,28 @@ def train(db: Session) -> dict:
     if len(baskets) < 10:
         return {"error": "Chưa đủ đơn hàng để khai phá luật kết hợp"}
 
+    basket_sizes = [len(b) for b in baskets]
+    input_info = {
+        "input": {
+            "total_orders": len(baskets),
+            "total_items": len(df),
+            "unique_products": df["product_id"].nunique(),
+            "avg_items_per_order": round(sum(basket_sizes) / len(basket_sizes), 2),
+            "min_support": MIN_SUPPORT,
+            "min_confidence": MIN_CONFIDENCE,
+            "min_lift": MIN_LIFT,
+        }
+    }
+    print("\n[Association] ── Dữ liệu đầu vào ───────────────────────")
+    print(f"  Tổng đơn hàng       : {len(baskets)}")
+    print(f"  Tổng items          : {len(df)}")
+    print(f"  Số sản phẩm         : {df['product_id'].nunique()}")
+    print(f"  Trung bình items/đơn: {input_info['input']['avg_items_per_order']}")
+    print(f"  Min support         : {MIN_SUPPORT}")
+    print(f"  Min confidence      : {MIN_CONFIDENCE}")
+    print(f"  Min lift            : {MIN_LIFT}")
+    print("────────────────────────────────────────────────────────\n")
+
     # Encode thành ma trận nhị phân
     te = TransactionEncoder()
     te_array = te.fit_transform(baskets)
@@ -75,8 +97,17 @@ def train(db: Session) -> dict:
             )
         db.commit()
 
-    return {"rules_saved": len(rows)}
-
+    result = {**input_info, "rules_saved": len(rows)}
+    print("[Association] ── Kết quả huấn luyện ────────────────────────")
+    print(f"  Frequent itemsets  : {len(frequent_items)}")
+    print(f"  Luật tìm được      : {len(rows)}")
+    if rows:
+        avg_conf = round(sum(r["confidence"] for r in rows) / len(rows), 4)
+        avg_lift = round(sum(r["lift"] for r in rows) / len(rows), 4)
+        print(f"  Confidence trung bình: {avg_conf}")
+        print(f"  Lift trung bình      : {avg_lift}")
+    print("────────────────────────────────────────────────────────\n")
+    return result
 
 def get_associated_products(product_id: int, db: Session, top_n: int = 5) -> list[dict]:
     """Lấy sản phẩm thường mua kèm với product_id từ DB."""
